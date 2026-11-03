@@ -1,25 +1,6 @@
-class AppUser {
-  final String uid;
-  final String name;
-  final String email;
-  final String role; // 'student' or 'staff'
+// Only emails from these domains can register
+const aluEmailDomains = ['alustudent.com', 'alueducation.com'];
 
-  AppUser({
-    required this.uid,
-    required this.name,
-    required this.email,
-    required this.role,
-  });
-
-  bool get isStaff => role == 'staff';
-
-  // Builds an AppUser from a Firestore users document
-  factory AppUser.fromMap(String uid, Map<String, dynamic> data) {
-    return AppUser(
-      uid: uid,
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      role: data['role'] ?? 'student',
-    );
-  }
-}
+// Firestore collection names
+const usersCollection = 'users';
+const incidentsCollection = 'incidents';
