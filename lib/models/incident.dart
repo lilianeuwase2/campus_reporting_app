@@ -8,6 +8,7 @@ class Incident {
   final String location;
   final String status;
   final String? photoUrl;
+  final String? photoPath; // the file's place in Storage
   final String reporterId;
   final String reporterName;
   final bool isAnonymous;
@@ -23,6 +24,7 @@ class Incident {
     required this.location,
     required this.status,
     this.photoUrl,
+    this.photoPath,
     required this.reporterId,
     required this.reporterName,
     this.isAnonymous = false,
@@ -42,6 +44,7 @@ class Incident {
       location: data['location'] ?? '',
       status: data['status'] ?? 'submitted',
       photoUrl: data['photoUrl'],
+      photoPath: data['photoPath'],
       reporterId: data['reporterId'] ?? '',
       reporterName: data['reporterName'] ?? 'Unknown',
       isAnonymous: data['isAnonymous'] ?? false,

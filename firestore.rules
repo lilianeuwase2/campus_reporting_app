@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Security rules for the Campus Reports app.
+// The app hides staff buttons from students, but these rules are what
+// actually enforce access: Firestore checks them on every read and write,
+// even if someone bypasses the app.
+//
+// To use them: Firebase Console -> Firestore Database -> Rules,
+// replace everything with this file, then click Publish.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helper functions ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Logged in with an ALU email address that has been verified
+    // (the person clicked the link we emailed them)
+    function isAluUser() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('.*@(alustudent|alueducation)[.]com');
+    }
+
+    // Looks up the caller's role in their own users document.
+    // exists() comes first so a missing profile simply means "not staff".
+    function isStaff() {
+      return isAluUser()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+    }
+
+    // ---------- users ----------
+
+    match /users/{userId} {
+      // You can read your own profile; staff can read anyone's
+      allow read: if signedIn() && (request.auth.uid == userId || isStaff());
+
+      // You can only create YOUR profile, and the role must match your email:
+      // @alueducation.com (ALU staff) may be staff, everyone else is a student.
+      // So nobody can make themselves staff from the app.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && (request.resource.data.role == 'student'
+            || (request.resource.data.role == 'staff'
+                && request.auth.token.email.lower().matches('.*@alueducation[.]com')));
+
+      // You can edit your profile (your name), but never change your own role
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 80;
+
+      allow delete: if false;
+    }
+
+    // ---------- incident reports ----------
+
+    match /incidents/{incidentId} {
+      // Any ALU user can browse reports
+      allow read: if isAluUser();
+
+      // Only students send reports (staff handle them). A new report must
+      // belong to the person sending it and must start as "submitted"
+      allow create: if isAluUser()
+        && !isStaff()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'submitted';
+
+      // Only staff can update a report, and only its status fields
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'staffNote', 'updatedAt']);
+
+      // The reporter can delete their own report, but only before staff act
+      allow delete: if isAluUser()
+        && resource.data.reporterId == request.auth.uid
+        && resource.data.status == 'submitted';
+
+      // ---------- status history ----------
+
+      match /updates/{updateId} {
+        allow read: if isAluUser();
+        // Only staff write history, and only in their own name
+        allow create: if isStaff()
+          && request.resource.data.updatedBy == request.auth.uid;
+        // History can never be rewritten or removed
+        allow update, delete: if false;
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
+import '../../widgets/loading_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -37,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     if (ok) {
-      // Go back so the AuthGate underneath can show the home screen
+      // Go back so the AuthGate underneath can show the verify screen
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context)
@@ -98,15 +99,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       v != _passwordCtrl.text ? 'Passwords do not match' : null,
                 ),
                 const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: auth.isLoading ? null : _submit,
-                  child: auth.isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Create account'),
+                LoadingButton(
+                  label: 'Create account',
+                  isLoading: auth.isLoading,
+                  onPressed: _submit,
                 ),
               ],
             ),

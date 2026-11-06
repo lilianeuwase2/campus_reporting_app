@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../widgets/loading_button.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
@@ -60,15 +61,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: _checking ? null : _check,
-                  child: _checking
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("I've verified my email"),
+                LoadingButton(
+                  label: "I've verified my email",
+                  isLoading: _checking,
+                  onPressed: _check,
                 ),
                 TextButton(
                   onPressed: _resend,

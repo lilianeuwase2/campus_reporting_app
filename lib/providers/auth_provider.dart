@@ -12,35 +12,71 @@ import '../utils/auth_errors.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _service;
-  StreamSubscription<User?>? _sub;
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<AppUser?>? _profileSub;
 
   User? _firebaseUser;
   AppUser? profile;
   bool verified = false;
   bool initializing = true; // true until Firebase tells us who is logged in
   bool isLoading = false;
+  bool isSavingProfile = false;
   String? error;
 
   AuthProvider(this._service) {
-    _sub = _service.authChanges.listen(_onAuthChanged);
+    _authSub = _service.authChanges.listen(_onAuthChanged);
   }
 
   Future<void> _onAuthChanged(User? user) async {
     _firebaseUser = user;
     verified = user?.emailVerified ?? false;
-    try {
-      profile = user == null ? null : await _service.loadProfile(user.uid);
-    } catch (_) {
-      profile = null;
+    // Stop listening to the previous user's profile
+    await _profileSub?.cancel();
+    _profileSub = null;
+    profile = null;
+    if (user == null) {
+      initializing = false;
+      notifyListeners(); // ring the bell: screens rebuild
+      return;
     }
-    initializing = false;
-    notifyListeners(); // ring the bell: screens rebuild
+    try {
+      await _service.createMissingProfile(user);
+    } catch (e) {
+      debugPrint('Could not create a missing profile: $e');
+    }
+    // Someone else may have logged in while we were waiting
+    if (_firebaseUser?.uid != user.uid) return;
+    // Listen to the profile, so a new name or role shows up straight away
+    _profileSub = _service
+        .watchProfile(user.uid)
+        .listen(
+          (p) {
+            profile = p;
+            initializing = false;
+            notifyListeners();
+          },
+          onError: (Object e) {
+            debugPrint('Loading profile failed: $e');
+            initializing = false;
+            notifyListeners();
+          },
+        );
   }
 
   bool get isLoggedIn => _firebaseUser != null;
   bool get isStaff => profile?.isStaff ?? false;
   String get email => _firebaseUser?.email ?? '';
   String? get uid => _firebaseUser?.uid;
+
+  // The name to show: the saved profile name, else the name typed at sign-up
+  String get displayName {
+    final saved = profile?.name.trim() ?? '';
+    if (saved.isNotEmpty) return saved;
+    return _firebaseUser?.displayName?.trim() ?? '';
+  }
+
+  // For places that always need something to show, like "Reported by ..."
+  String get nameOrEmail => displayName.isEmpty ? email : displayName;
 
   Future<bool> login(String email, String password) =>
       _run(() => _service.login(email, password));
@@ -51,12 +87,27 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> checkVerified() async {
     verified = await _service.refreshAndCheckVerified();
-    if (verified && uid != null) profile = await _service.loadProfile(uid!);
     notifyListeners();
     return verified;
   }
 
   Future<void> resendVerification() => _service.resendVerification();
+
+  // Returns null if it worked, or an error message to show
+  Future<String?> updateName(String name) async {
+    isSavingProfile = true;
+    notifyListeners();
+    try {
+      await _service.updateName(name);
+      return null; // the live profile shows the new name by itself
+    } catch (e) {
+      debugPrint('Saving name failed: $e');
+      return 'Could not save your name. Please try again.';
+    } finally {
+      isSavingProfile = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> logout() => _service.logout();
 
@@ -82,7 +133,8 @@ class AuthProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _authSub?.cancel();
+    _profileSub?.cancel();
     super.dispose();
   }
 }

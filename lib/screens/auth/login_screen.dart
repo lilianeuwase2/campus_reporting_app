@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../utils/app_theme.dart';
 import '../../utils/validators.dart';
+import '../../widgets/loading_button.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,8 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate())
-      return; // stop if any field is invalid
+    // Stop if any field is invalid
+    if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
     final ok = await auth.login(_emailCtrl.text, _passwordCtrl.text);
     if (!ok && mounted) {
@@ -49,7 +51,22 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.report_problem_outlined, size: 64),
+                  // App logo: a white megaphone on a blue rounded square
+                  Center(
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.headerGradient,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Campus Reports',
@@ -94,15 +111,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         (v == null || v.isEmpty) ? 'Enter your password' : null,
                   ),
                   const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: auth.isLoading ? null : _submit,
-                    child: auth.isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Log in'),
+                  LoadingButton(
+                    label: 'Log in',
+                    isLoading: auth.isLoading,
+                    onPressed: _submit,
                   ),
                   TextButton(
                     onPressed: () => Navigator.push(
